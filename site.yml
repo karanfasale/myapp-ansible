@@ -1,0 +1,146 @@
+---
+# ============================================================
+# site.yml — Configure all app servers
+# Run: ansible-playbook -i inventory.ini site.yml
+#
+# Before running, replace rds_endpoint below with:
+#   terraform output rds_endpoint
+# ============================================================
+
+- name: Configure web servers
+  hosts: webservers
+  become: yes
+
+  # KEY FIX: Give the instance time to finish user_data bootstrap
+  # before Ansible tries to connect. Without this, apt locks collide.
+  gather_facts: yes
+
+  environment:
+    # KEY FIX: Prevents apt from hanging on interactive prompts
+    DEBIAN_FRONTEND: noninteractive
+
+  vars:
+    rds_endpoint: "YOUR_RDS_ENDPOINT_HERE"   # <-- replace with: terraform output rds_endpoint
+    db_username:  "admin"
+    db_password:  "YourStrongPassword123!"
+    db_name:      "myappdb"
+    ansible_python_interpreter: /usr/bin/python3
+
+  pre_tasks:
+
+    # --------------------------------------------------------
+    # WAIT FOR INSTANCE TO BE FULLY READY
+    # Prevents "apt lock" errors when user_data is still running
+    # --------------------------------------------------------
+    - name: Wait for apt lock to be released (user_data may still be running)
+      shell: |
+        while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+          echo "Waiting for apt lock..."
+          sleep 5
+        done
+        echo "Lock released"
+      changed_when: false
+      timeout: 300
+
+    - name: Update apt package cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+      # KEY FIX: Removed "upgrade: dist" — causes 10+ min timeouts on fresh instances
+
+  tasks:
+
+    # --------------------------------------------------------
+    # INSTALL APACHE + PHP + MYSQL CLIENT
+    # --------------------------------------------------------
+    - name: Install Apache, PHP, and MySQL client
+      apt:
+        name:
+          - apache2
+          - php
+          - php-mysql
+          - php-cli
+          - mysql-client
+          - libapache2-mod-php
+        state: present
+        install_recommends: no
+
+    # --------------------------------------------------------
+    # START & ENABLE APACHE
+    # --------------------------------------------------------
+    - name: Enable and start Apache service
+      service:
+        name: apache2
+        state: started
+        enabled: yes
+
+    # --------------------------------------------------------
+    # VERIFY PHP IS WORKING
+    # --------------------------------------------------------
+    - name: Check PHP version
+      command: php --version
+      register: php_version
+      changed_when: false
+
+    - name: Show PHP version
+      debug:
+        msg: "{{ php_version.stdout_lines[0] }}"
+
+    # --------------------------------------------------------
+    # CREATE APP DIRECTORY
+    # --------------------------------------------------------
+    - name: Create app directory under web root
+      file:
+        path: /var/www/html/app
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: "0755"
+
+    # --------------------------------------------------------
+    # DEPLOY PHP FILES FROM TEMPLATES
+    # --------------------------------------------------------
+    - name: Deploy db_config.php (database connection)
+      template:
+        src: templates/db_config.php.j2
+        dest: /var/www/html/app/db_config.php
+        owner: www-data
+        group: www-data
+        mode: "0644"
+
+    - name: Deploy index.php (main page)
+      template:
+        src: templates/index.php.j2
+        dest: /var/www/html/index.php
+        owner: www-data
+        group: www-data
+        mode: "0644"
+
+    # --------------------------------------------------------
+    # REMOVE DEFAULT APACHE PAGE
+    # --------------------------------------------------------
+    - name: Remove default Apache index.html
+      file:
+        path: /var/www/html/index.html
+        state: absent
+
+    # --------------------------------------------------------
+    # RESTART APACHE to pick up PHP module
+    # --------------------------------------------------------
+    - name: Restart Apache to apply all changes
+      service:
+        name: apache2
+        state: restarted
+
+    # --------------------------------------------------------
+    # FINAL VERIFICATION
+    # --------------------------------------------------------
+    - name: Verify Apache is serving PHP
+      command: curl -s http://localhost/
+      register: curl_output
+      changed_when: false
+
+    - name: Show curl output (first 200 chars)
+      debug:
+        msg: "{{ curl_output.stdout[:200] }}"
+

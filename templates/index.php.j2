@@ -1,0 +1,9 @@
+<?php
+echo "<h1>🚀 Web Server Running</h1>";
+echo "<p><strong>Hostname:</strong> " . gethostname() . "</p>";
+echo "<p><strong>Server IP:</strong> " . $_SERVER['SERVER_ADDR'] . "</p>";
+echo "<p><strong>PHP Version:</strong> " . phpversion() . "</p>";
+echo "<hr>";
+echo "<h2>Database Status</h2>";
+include('/var/www/html/app/db_config.php');
+?>
