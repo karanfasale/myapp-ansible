@@ -20,7 +20,7 @@
     DEBIAN_FRONTEND: noninteractive
 
   vars:
-    rds_endpoint: "YOUR_RDS_ENDPOINT_HERE"   # <-- replace with: terraform output rds_endpoint
+    rds_endpoint: "myapp-mysql.crayg0ime5lo.ap-south-1.rds.amazonaws.com:3306"   # <-- replace with: terraform output rds_endpoint
     db_username:  "admin"
     db_password:  "YourStrongPassword123!"
     db_name:      "myappdb"
