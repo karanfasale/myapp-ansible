@@ -1,9 +1,142 @@
 <?php
-echo "<h1>🚀 Web Server Running</h1>";
-echo "<p><strong>Hostname:</strong> " . gethostname() . "</p>";
-echo "<p><strong>Server IP:</strong> " . $_SERVER['SERVER_ADDR'] . "</p>";
-echo "<p><strong>PHP Version:</strong> " . phpversion() . "</p>";
-echo "<hr>";
-echo "<h2>Database Status</h2>";
-include('/var/www/html/app/db_config.php');
+$version    = "v2.0";
+$deployed   = "Deployed by Jenkins + Ansible";
+$hostname   = gethostname();
+$server_ip  = $_SERVER['SERVER_ADDR'];
+$php_ver    = phpversion();
 ?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My App — <?php echo $hostname; ?></title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f4f6f9;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.10);
+      padding: 40px 48px;
+      max-width: 520px;
+      width: 100%;
+    }
+    .badge {
+      display: inline-block;
+      background: #e8f5e9;
+      color: #2e7d32;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 4px 12px;
+      border-radius: 20px;
+      margin-bottom: 20px;
+      letter-spacing: 0.3px;
+    }
+    h1 {
+      font-size: 26px;
+      font-weight: 700;
+      color: #1a1a2e;
+      margin-bottom: 6px;
+    }
+    .subtitle {
+      font-size: 14px;
+      color: #888;
+      margin-bottom: 32px;
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px 0;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 15px;
+    }
+    .info-row:last-of-type { border-bottom: none; }
+    .info-label { color: #555; font-weight: 500; }
+    .info-value { color: #1a1a2e; font-weight: 600; }
+    .divider {
+      border: none;
+      border-top: 1px solid #efefef;
+      margin: 24px 0;
+    }
+    .db-status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 18px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 500;
+      margin-top: 8px;
+    }
+    .db-ok  { background: #e8f5e9; color: #2e7d32; }
+    .db-err { background: #fdecea; color: #c62828; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .dot-ok  { background: #43a047; }
+    .dot-err { background: #e53935; }
+  </style>
+</head>
+<body>
+  <div class="card">
+
+    <div class="badge">&#10003; Live</div>
+
+    <h1>&#128640; Web Server Running</h1>
+    <p class="subtitle"><?php echo $deployed; ?></p>
+
+    <div class="info-row">
+      <span class="info-label">Version</span>
+      <span class="info-value"><?php echo $version; ?></span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Hostname</span>
+      <span class="info-value"><?php echo $hostname; ?></span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">Server IP</span>
+      <span class="info-value"><?php echo $server_ip; ?></span>
+    </div>
+    <div class="info-row">
+      <span class="info-label">PHP Version</span>
+      <span class="info-value"><?php echo $php_ver; ?></span>
+    </div>
+
+    <hr class="divider">
+
+    <div class="info-label" style="margin-bottom:10px;">Database Status</div>
+
+    <?php
+    $host     = "{{ rds_endpoint }}";
+    $user     = "{{ db_username }}";
+    $password = "{{ db_password }}";
+    $database = "{{ db_name }}";
+
+    try {
+        $pdo = new PDO("mysql:host=$host;dbname=$database", $user, $password);
+        $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+        $mysql_ver = $pdo->query('SELECT VERSION()')->fetchColumn();
+        echo "<div class='db-status db-ok'>
+                <span class='dot dot-ok'></span>
+                Connected &nbsp;&mdash;&nbsp; MySQL $mysql_ver
+              </div>";
+    } catch (PDOException $e) {
+        echo "<div class='db-status db-err'>
+                <span class='dot dot-err'></span>
+                Connection failed: " . htmlspecialchars($e->getMessage()) . "
+              </div>";
+    }
+    ?>
+
+  </div>
+</body>
+</html>
+
