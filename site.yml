@@ -144,3 +144,4 @@
       debug:
         msg: "{{ curl_output.stdout[:200] }}"
 
+# test trigger
